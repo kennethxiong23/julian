@@ -9,6 +9,7 @@
 from time import time
 import random
 from itertools import permutations
+from itertools import combinations
 from  turtle import *
 
 def findDistance(x, y):
@@ -29,27 +30,23 @@ def getShortestPath(depot, u, q, num):
     """
 
     if num == 2: #base case
+        minPath = []
         minDist = None
-        cust1 = []
-        cust2 = []
-        for startCust in q: #brute force combinations
-            for cust in q:
-                if cust != startCust:
-                    distance = findDistance(depot, startCust) + findDistance(startCust, cust) + findDistance(cust, u)
-                    if minDist == None: #first run edge case
-                        minDist = distance
-                        cust1 = startCust
-                        cust2 = cust
-                    elif distance < minDist: #compare for lowest value
-                        distance = minDist
-                        cust1 = startCust
-                        cust2 = cust
-        path = [cust1, cust2]
-        print(path)
-        return path
+        paths = list(permutations(q, 2))
+        for path in paths:
+            path = list(path)
+            distance = getTotalDistance(depot,u, path)
+            if minDist == None:
+                minDist = distance
+                minPath = path
+            elif distance < minDist:
+                minDist = distance
+                minPath = path
+
+        print(minPath)
+        return minPath
 
     else:
-        startPath = getShortestPath(depot, u, q, 2)
         path = getShortestPath(depot, u, q, num - 1)
 
         for cust in path: #remove already chosen path from the list
@@ -63,7 +60,7 @@ def getShortestPath(depot, u, q, num):
             if minDist == None:
                 minDist = distance
                 minCust = cust
-            elif distance < minDist:
+            elif distance > minDist:
                 minDist = distance
                 minCust = cust
         minDist = None
@@ -72,8 +69,8 @@ def getShortestPath(depot, u, q, num):
             for i in range(len(path) + 1):
                 possiblePath = path[0:i] + [minCust] + path[i:]
                 # distance = getTotalDistance(depot, u, possiblePath)
-                distance = getTotalDistance(possiblePath[0], possiblePath[-1], possiblePath)
-                # print(num," my way dist: ", distance)
+                distance = getTotalDistance(depot, possiblePath[-1], possiblePath)
+                print(num," my way dist: ", distance)
                 if minDist == None:
                     minDist = distance
                     minPath = possiblePath
@@ -81,12 +78,12 @@ def getShortestPath(depot, u, q, num):
                     minDist = distance
                     minPath = possiblePath
 
-            index1 = path.index(startPath[0])
-            index2 = path.index(startPath[1])
-            path[index1] = startPath[1]
-            path[index2] = startPath[0]
+            # index1 = path.index(startPath[0])
+            # index2 = path.index(startPath[1])
+            # path[index1] = startPath[1]
+            # path[index2] = startPath[0]
 
-        # print(num," minDist ", minDist)
+        print(num," minDist ", minDist)
         print(num, "minPath", minPath)
         return minPath
 
@@ -201,6 +198,7 @@ def main():
     points = path + [depot] + [end]
     print(points)
     start = getShortestPath(depot, end, path, 2)
+    print(start)
     for point in points:
         if point in start:
             setup.color("yellow")
