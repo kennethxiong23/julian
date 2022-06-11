@@ -11,6 +11,7 @@ import random
 from itertools import permutations
 from itertools import combinations
 from  turtle import *
+import sys
 
 def findDistance(x, y):
     """
@@ -205,7 +206,7 @@ def bruteForce(depot,q ,u):
     print(minDist)
     return minPath
 
-
+num = int(sys.argv[1])
 def main():
     depot = (0,0) #x,y coordinate is represented by a list
     # customers = [(-30, -21), (2, 18), (5, 12), (16, 1), (13, 0)]
@@ -213,7 +214,9 @@ def main():
     random.shuffle(customers)
     print(customers)
     end = (10,10) #should be apart of customers, ommited for testing
-    while len(customers) < 25:
+
+    print(num)
+    while len(customers) < num:
         point= (random.randrange(-30,30), random.randrange(-30,30))
         if point not in customers:
             customers.append(point)
@@ -221,7 +224,7 @@ def main():
     customers2 = customers1
 
     time0 = time()
-    # bruteForcePath = bruteForce(depot,customers1, end)
+    bruteForcePath = bruteForce(depot,customers1, end)
     time1 = time()
     # path = getShortestPath(depot, end, customers, len(customers))
 
@@ -232,7 +235,7 @@ def main():
     # print(getTotalDistance(depot, end, bruteForcePath[0]), "long")
 
     # print(distance)
-    # print(bruteForcePath)
+    print(bruteForcePath)
     print(time0, time1)
     print(time1-time0, "bruteForce")
     print(time2-time1, "my way")
