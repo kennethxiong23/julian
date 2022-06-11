@@ -87,22 +87,84 @@ def getShortestPath(depot, u, q, num):
         print(num, "minPath", minPath)
         return minPath
 
+def getShorterPath(depot, q, u):
+    q = tuple(q) #keys need to be immutable
+    distances = {}
+    for i in range(2, len(q) + 1):
+        paths = combinations(q, i)
+        # keep track of the path that has the lowest distance
+        minDist = None
+        minKey = None
+        #check every combination
+        for path in paths:
+            path = tuple(sorted(path))
+            for k in range(len(path)):
+                end = path[k]
+                partialPath = path[0:k] + path[k + 1:]
+                #Keep track of leaast cost path
+                optimizer = None
+                minDistance = None
+                #find possible ways to the end point
+                for y in path:
+                    if y != end:
+                        if len(path) == 2: #base case of only two points
+                            distance = findDistance(depot, partialPath[0]) + findDistance(partialPath[0], end)
+                            distances[(path, end)] = (distance, y)
+                            optimizer = y
+                            minDistance = distance
+                        else:
+                            # previousPath = tuple(list(partialPath).remove(y)
+                            distance = distances[(partialPath, y)][0] + findDistance(y, end)
+                            # print((partialPath, y), distances[(partialPath, y)][0], findDistance(y, end), end, distance, optimizer , minDistance)
+                            # keep track of min optimizer
+                            if optimizer == None:
+                                optimizer = y
+                                minDistance = distance
+                            elif distance < minDistance:
+                                optimizer = y
+                                minDistance = distance
+                            #keep track of the least cost path for the end
+                            if minDist == None:
+                                minDist = distance
+                                minKey = (path, end)
+                            elif distance < minDist:
+                                minDist = distance
+                                minKey = (path, end)
+                # print(minDistance,optimizer)
+                distances[(path, end)] = (minDistance, optimizer)
+    #this section is for the final path, adds u to possible points
+    # print(distances)
+    minDist = None
+    optimizer = None
+    partialPath = tuple(sorted(q))
+    #adds u to the tuple
+    q = list(sorted(q))
+    q.append(u)
+    q = tuple(q)
+    for y in partialPath: #same code as above
+        distance = distances[(partialPath, y)][0] + findDistance(y, u)
+        if optimizer == None:
+            optimizer = y
+            minDistance = distance
+        elif distance < minDistance:
+            optimizer = y
+            minDistance = distance
+        # print(minDistance, "hey")
+    minKey = (q, u)
+    distances[minKey] = (distance, optimizer)
+    # print(minKey)
+    # print(distances)
+    #goes through the dictionary to assemble the final path
+    minPath = []
+    for i in range(len(q)-1):
+        cust = distances[minKey][1]
+        minPath.insert(0, cust)
+        newPath = list(minKey[0])
+        newPath.remove(minKey[1])
+        newPath = tuple(newPath)
+        minKey = (newPath, cust)
 
-
-        # for cust in q: #fix this too
-        #     distance = findDistance(depot, path[0])
-        #     for i in range(0, len(path)-2):
-        #         distance += findDistance(path[i], path[i+1])
-        #     distance += findDistance(path[-1], cust) + findDistance(cust, u)
-        #     if minDist == None:
-        #         minDist = distance
-        #         minCust = cust
-        #     elif distance < minDist:
-        #         minDist = distance
-        #         minCust = cust
-        # path.append(minCust)
-
-        return path
+    return minPath
 
 def getTotalDistance(depot, end, path):
     distance = 0 #add edge cases
@@ -138,39 +200,44 @@ def bruteForce(depot,q ,u):
             minDist = distance
             minPath = [list(path)]
         elif minDist == distance:
-
             minPath.append(list(path))
         distance = None
-    print("brute force", minDist)
+    print(minDist)
     return minPath
 
 
 def main():
-    depot = [0,0] #x,y coordinate is represented by a list
-    # customers = [[3,22], [332,5], [3217,8], [21,3]]
-    customers = []
-    end = [10,10] #should be apart of customers, ommited for testing
-    while len(customers) < 7:
-        point= [random.randrange(-30,30), random.randrange(-30,30)]
+    depot = (0,0) #x,y coordinate is represented by a list
+    # customers = [(-30, -21), (2, 18), (5, 12), (16, 1), (13, 0)]
+    customers =[]
+    random.shuffle(customers)
+    print(customers)
+    end = (10,10) #should be apart of customers, ommited for testing
+    while len(customers) < 25:
+        point= (random.randrange(-30,30), random.randrange(-30,30))
         if point not in customers:
             customers.append(point)
     customers1 = customers
     customers2 = customers1
 
     time0 = time()
-    bruteForcePath = bruteForce(depot,customers1, end)
+    # bruteForcePath = bruteForce(depot,customers1, end)
     time1 = time()
-    path = getShortestPath(depot, end, customers, len(customers))
-    time2 = time()
+    # path = getShortestPath(depot, end, customers, len(customers))
 
+    path = getShorterPath(depot, customers1, end)
+    time2 = time()
+    print(getTotalDistance(depot, end, path), "shorts")
+    print(path)
+    # print(getTotalDistance(depot, end, bruteForcePath[0]), "long")
 
     # print(distance)
-    print(bruteForcePath)
-    print(path)
+    # print(bruteForcePath)
+    print(time0, time1)
     print(time1-time0, "bruteForce")
     print(time2-time1, "my way")
 
-    print(path in bruteForcePath)
+    assert path in bruteForcePath
     scale = 15
     colors = ["green", "orange", "yellow", "purple", "grey", "lime", "brown"]
     bruteForceTurtle = Turtle()
@@ -195,7 +262,7 @@ def main():
     setup.speed(100)
     setup.color("blue")
     setup.pensize(15)
-    points = path + [depot] + [end]
+    points = list(path) + [depot] + [end]
     print(points)
     start = getShortestPath(depot, end, path, 2)
     print(start)
