@@ -134,7 +134,6 @@ def getShorterPath(depot, q, u):
                                 minKey = (path, end)
                 # print(minDistance,optimizer)
                 distances[(path, end)] = (minDistance, optimizer)
-        print(i)
     #this section is for the final path, adds u to possible points
     # print(distances)
     minDist = None
@@ -284,13 +283,3 @@ if __name__ == "__main__":
 
 
     exitonclick()
-
-
-
-
-
-
-
-
-
-
