@@ -25,7 +25,7 @@ if args.demand_max == None:
     args.demand_max = 3
 
 
-def calculateRoute(auvdl, depot):
+def calculateRoute(auvdl, depot, capacity):
     """
     Purpose: Calculates the route, the cost, and feasibility of a route given a list of the route's auvdl
     values.
@@ -34,12 +34,24 @@ def calculateRoute(auvdl, depot):
     """
     auvdl.sort(reverse = True, key = getLastElement) #sorts d val from largest to smallest for route construction
     route = []
+    aul = []
     for uvd in auvdl: #builds the route from the auvdl
         if uvd[2] < 0: #checks if demmand ever exceeds capacity
             return -1
+        if capacity != uvd[2]: #make ssure d lines up
+            return -1
+        if uvd[0] == uvd[1]: #can't start and end at same place
+            return -1
+        if uvd[0] in aul: #can't start from the same place multiple times
+            return -1
+        if uvd != depot:
+            if auvdl[len(route) - 1][1] != uvd[0]: #makes sure the previous end and current start are the same
+                return -1
         route.append(uvd[0]) #adds the u term to the route
         if uvd == auvdl[-1]: #adds the v term of the last auvdl term
             route.append(uvd[1])
+        capacity -= uvd[1][1]
+        aul.append(uvd[0])
     if validateRoute(route, depot) == False: #makes sure route meets equations (5, 6, 7)
         return -1
     else:
@@ -237,12 +249,32 @@ if __name__ == "__main__":
     else:
         print("\nOutput: -1\nRoute is not feasible")
 
+    #check distances not lining up
+    auvdl = [[((0, 0), 0), ((-20, 26), 2), 10], [((-20, 26), 1), ((-2, 16), 1), 8], [((-2, 16), 1), ((-29, -4), 2), 7],
+    [((-29, -4), 2), ((10, -9), 2), 5], [((10, -9), 2), ((-3, -22), 1), 3], [((-3, -22), 1), ((0, 0), 0), 2]]
+    assert calculateRoute(auvdl, depot, capacity) == -1
+
+    #check going to self
+    auvdl = [[((0, 0), 0), ((-20, 26), 2), 10], [((-20, 26), 2), ((-20, 26), 2), 8], [((-2, 16), 1), ((-29, -4), 2), 7],
+    [((-29, -4), 2), ((10, -9), 2), 5], [((10, -9), 2), ((-3, -22), 1), 3], [((-3, -22), 1), ((0, 0), 0), 2]]
+    assert calculateRoute(auvdl, depot, capacity) == -1
+
+    #check starting from same place twice
+    auvdl = [[((0, 0), 0), ((-20, 26), 2), 10], [((-20, 26), 2), ((-2, 16), 1), 8], [((-20, 26), 2), ((-29, -4), 2), 6],
+    [((-29, -4), 2), ((10, -9), 2), 5], [((10, -9), 2), ((-3, -22), 1), 3], [((-3, -22), 1), ((0, 0), 0), 2]]
+    assert calculateRoute(auvdl, depot, capacity) == -1
+
+    #check not end and starting in the same place
+    auvdl = [[((0, 0), 0), ((-20, 26), 2), 10], [((-20, 26), 2), ((-2, 16), 1), 8], [((-2, 85), 1), ((-29, -4), 2), 7],
+    [((-29, -4), 2), ((10, -9), 2), 5], [((10, -9), 2), ((-3, -22), 1), 3], [((-3, -22), 1), ((0, 0), 0), 2]]
+    assert calculateRoute(auvdl, depot, capacity) == -1
+
     print("----------calculateRoute()------------")
     if routeInfo == -1:
         print("getRouteInfo() did not return a valid route")
     else:
         print("input:\nauvdl-%s\ndepot-%s" %(routeInfo[1], depot))
-        reformedRoute = calculateRoute(routeInfo[1], depot)
+        reformedRoute = calculateRoute(routeInfo[1], depot, capacity)
         assert reformedRoute[0] == route
         assert reformedRoute[1] == routeInfo[2]
         if reformedRoute != -1:
