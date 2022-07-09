@@ -1,7 +1,8 @@
 """
 Description: This programs finds the least cost set of routes that visits each customer in a set of
                     customersList once. The demmand of each one of these routes must not excede the capcaity
-                    of the trucks visiting the customersList.
+                    of the trucks visiting the customersList. This program includes the same algorithm as in
+                    bab.py, but also includes an alternative branching algorithm(newBranchAndBound()).
 Name: Kenneth
 Date: 6/29/22
 """
@@ -199,12 +200,96 @@ def branchAndBound(customersList, allRoutes, allFeasibleRoutes, capacity, depot)
                 branchTree.append([oneBranch, oneBranchRes["fun"], oneBranchRes['x']])
                 branchTree.append([zeroBranch, zeroBranchRes["fun"], zeroBranchRes['x']])
 
+def newBranchAndBound(customersList, allRoutes, allFeasibleRoutes, capacity, depot):
+    """
+    Purpose: Implementation of branch and bound algorithm. This one branches based on two custs
+    u and v. It creates two branches, one that turns off all routes with u and v, and ones that turns
+    off all routes that have only u.
+    Parameters: The list of customers, A dictionary with all routes, A list of all feasible routes, the
+    capacity of each truck(int), and the depot
+    Return Val: the standard return dict of scipy.linprog() just of the optimial integer lp
+    """
+    branchTree = []
+    costList = [] #stores all the cost scalors for all thetas
+    branch = [] #sets the bounds of each theta, default is 0-1. Simulates turning on and off a path
+    for route in allFeasibleRoutes: #goes through and find cost of each route, and adds a theta to branch
+        cost = allRoutes[route][0] + findDistance(route[1][0], depot[0])
+        costList.append(cost)
+        branch.append((0,1))
+    A = [] # array of a_ul values for each path
+    for cust in customersList: #assembles a_ul value by row
+        row = []
+        for route in allFeasibleRoutes:
+            if cust in route[0]:
+                row.append(-1) #vals are stored as -1 to invert the defaul inequality
+            else:
+                row.append(0)
+        A.append(row)
+    b = [-1] * len(customersList) #restrics the objective function, array of a_ul * thetas < 1
+    res = linprog(costList, A_ub=A, b_ub=b, bounds=branch) #first LP
+    branchTree.append((branch, res["fun"], res["x"]))#adds branch to tree
+    #initialize uv and u branch
+    uvBranch = branch.copy()
+    uBranch = branch.copy()
+    n = 1 #interations of while loop
+    while True:
+        n += 1
+        minCost = None
+        minIndex = None
+        for i in range(len(branchTree)): #finds the index of the lowest cost branch
+            if minCost == None or branchTree[i][1] < minCost:
+                minCost = branchTree[i][1]
+                minCost = i
+        currentBranch = branchTree.pop(i) #sets current branch to lowest cost branch
+        resVal = currentBranch[2] #value of all theta's after solving the lp
+        bounds = currentBranch[0] #matrix of all the bounds for the paths
+        for i in range(len(resVal)): #rounds all the tiny float vals to three decimal places
+            resVal[i] = round(resVal[i], 3)
+        difference = 1
+        ALL_INTS = True
+        index = None
+        u = None
+        v = None
+        #finds the index of the theta value closest to 0.5 to to branch on, also checks if all are integer
+        for i in range(len(resVal)):
+            if resVal[i] % 1 != 0:
+                ALL_INTS = False
+            if 0 < resVal[i] < 1:
+                if index == None or resVal[i] % 0.5 < difference :
+                    #makes sure that chosen path is greater than length 2, need a 2 unique cust to branch on
+                    if len(allFeasibleRoutes[i][0]) >= 2:
+                        index = i
+                        u = allFeasibleRoutes[i][0][0]#first point in path
+                        v = allFeasibleRoutes[i][0][1]#second point in path
+        #if all are integer that means that optimal integer solution has been reached
+        if ALL_INTS == True:
+            print("%s branches checked" %n)
+            return currentBranch
+        #creates the branches that set paths with u and v to zero, and just u to zero
+        for i in range(len(bounds)):
+            if u in allFeasibleRoutes[i][0] and v in allFeasibleRoutes[i][0]:
+                uvBranch[i] = (0,0)
+            else:
+                uvBranch[i] = bounds[i]
+            if u in allFeasibleRoutes[i][0] and v not in allFeasibleRoutes[i][0]:
+                uBranch[i] = (0,0)
+            else:
+                uBranch[i] = bounds[i]
+        #add bracnhes to bracnh tree, and solve the lp for both
+        print(uBranch)
+        uvBranchRes = linprog(costList, A_ub=A, b_ub=b, bounds=uvBranch)
+        uBranchRes = linprog(costList, A_ub=A, b_ub=b, bounds=uBranch)
+        print(uvBranchRes)
+        branchTree.append([uvBranch, uvBranchRes["fun"], uvBranchRes['x']])
+        branchTree.append([uBranch, uBranchRes["fun"], uBranchRes['x']])
+
 def calculateRoutes(allRoutes, allFeasibleRoutes, solution):
     """
     Purpose: takes the output from the branch and bound finds the actual paths
     Parameters: A dictionary of all the routes, a list of all feasible routes, and the output from branchAndBound()
     Return Val: a list with the routes that constitute the solution.
     """
+    print(solution)
     routeKeys = []
     visitedRoutes = solution[2]
     for i in range(len(allFeasibleRoutes)):
@@ -241,7 +326,7 @@ def main():
     #     num += 1
 
     allRoutes, allFeasibleRoutes = getShorterPath(depot, customersList, depot, capacity)
-    optimalSol = branchAndBound(customersList, allRoutes, allFeasibleRoutes, capacity, depot)
+    optimalSol = newBranchAndBound(customersList, allRoutes, allFeasibleRoutes, capacity, depot)
     routes = calculateRoutes(allRoutes, allFeasibleRoutes, optimalSol)
     print(routes)
     print("-----------NY Example-----------")
@@ -276,9 +361,6 @@ def main():
         if point not in customersList:
             customersList.append((point, demand, "cust %s" %num))
         num += 1
-    allRoutes, allFeasibleRoutes = getShorterPath(depot, customersList, depot, capacity)
-    optimalSol = branchAndBound(customersList, allRoutes, allFeasibleRoutes, capacity, depot)
-    routes = calculateRoutes(allRoutes, allFeasibleRoutes, optimalSol)
     print("-----------Random Example-----------")
     colors = ["green", "orange", "yellow", "purple", "grey", "lime", "brown"]
     customerString = "Customers: %15s"
@@ -298,6 +380,14 @@ def main():
     print(locationString %tuple(locationList))
     print(demmandString %tuple(demmandList))
     print("\nTruck Capacity %s" %capacity)
+    print(routes)
+    allRoutes, allFeasibleRoutes = getShorterPath(depot, customersList, depot, capacity)
+    newOptimalSol = newBranchAndBound(customersList, allRoutes, allFeasibleRoutes, capacity, depot)
+    OptimalSol = branchAndBound(customersList, allRoutes, allFeasibleRoutes, capacity, depot)
+    newRoutes = calculateRoutes(allRoutes, allFeasibleRoutes, newOptimalSol)
+    routes = calculateRoutes(allRoutes, allFeasibleRoutes, OptimalSol)
+
+    assert routes == newRoutes
     print("Total Cost: %s" %round(optimalSol[1],3))
     routeString = "routes:"
     routeList = []
