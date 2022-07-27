@@ -61,7 +61,7 @@ def findRoutes(depot, custList, capacity):
         restrictedRoutes.append([depot, cust, depot])
         objCoef.append(-1)
     while True:
-        #adds to coefficient of c_l for eahc route, not in obj func, so 0
+        #adds to coefficient of c_l for each route, not in obj func, so 0
         for route in restrictedRoutes:
             if len(objCoef) < len(custList) + len(restrictedRoutes):
                 objCoef.append(0)
@@ -80,10 +80,10 @@ def findRoutes(depot, custList, capacity):
             constrCoef += filler
             constrCoefList.append(constrCoef)
             routeNum += 1
-            
+
         #adds coef for setting the value of c_l
         for i in range(len(restrictedRoutes)):
-            constrCoef = [0] * len(restrictedRoutes) 
+            constrCoef = [0] * len(restrictedRoutes)
             constrCoef[i] = 1
             filler = [0] * len(custList)
             constrCoef = filler + constrCoef
@@ -99,58 +99,57 @@ def findRoutes(depot, custList, capacity):
         res = milp(c=objCoef, constraints=constraints, integrality=integrality)
         piList = res["x"][0:len(restrictedRoutes)]
         # routeCostList = rex["x"][len(restrictedRoutes):]
-        possibleCustLists = []
+        # possibleCustLists = []
         route = [depot]
-        endCust = depot
+        # endCust = depot
         routeCapacity = capacity
-        print(res)
+        # print(res)
         #tries to create the path that violtes the contraint the most
-        while True:
-            #calculates resulting value for each partial path
+        # while True:
+        #     #calculates resulting value for each partial path
+        #     totalPi = 0
+        #     for cust in route[1:-1]:
+        #         index = custList.index(cust)
+        #         totalPi += piList[index]
+        #     #generates every possible cust to visit next, includes resulting const val
+        #     for i in range(len(custList)):
+        #         if custList[i] not in route:
+        #             deltaCust = findDistance(endCust[0], custList[i][0]) - (totalPi + piList[i])
+        #             possibleCustLists.append([custList[i], deltaCust])
+        #     possibleCustLists.sort(key=getDemmand)
+        #     #find worse possible point
+        #     minCust = None
+        #     for cust in possibleCustLists:
+        #         if minCust == None or minCust[1] > cust[1]:
+        #             minCust = cust
+        #         if minCust[0][1] > routeCapacity:
+        #             minCust = None
+        #     #if all exceed capacity route is finished
+        #     if minCust != None:
+        #         routeCapacity -= minCust[0][1]
+        #         route.append(minCust[0])
+        #     else:
+                #if the most egrigous route meets the constraint optimal sol is found
+            cost = getTotalDistance(route)
             totalPi = 0
             for cust in route[1:-1]:
                 index = custList.index(cust)
                 totalPi += piList[index]
-            #generates every possible cust to visit next, includes resulting const val
-            for i in range(len(custList)):
-                if custList[i] not in route:
-                    deltaCust = findDistance(endCust[0], custList[i][0]) - (totalPi + piList[i])
-                    possibleCustLists.append([custList[i], deltaCust])
-            possibleCustLists.sort(key=getDemmand)
-            #find worse possible point
-            minCust = None
-            for cust in possibleCustLists:
-                if minCust == None or minCust[1] > cust[1]:
-                    minCust = cust
-                if minCust[0][1] > routeCapacity:
-                    minCust = None
-            #if all exceed capacity route is finished
-            if minCust != None:
-                routeCapacity -= minCust[0][1]
-                route.append(minCust[0])
-            else:
-                #if the most egrigous route meets the constraint optimal sol is found
-                cost = getTotalDistance(route)
-                totalPi = 0
-                for cust in route[1:-1]:
-                    index = custList.index(cust)
-                    totalPi += piList[index]
-                if cost - totalPi == 0:
-                    break
-                route.append(depot)
-                restrictedRoutes.append(route)
+            if cost - totalPi == 0:
                 break
-            endCust = route[-1]
+            route.append(depot)
+            restrictedRoutes.append(route)
+            break
         #if the most egrigous route meets the constraint optimal sol is found
         cost = getTotalDistance(route)
         totalPi = 0
         for cust in route[1:-1]:
             index = custList.index(cust)
             totalPi += piList[index]
-        print(cost - totalPi)
+        # print(cost - totalPi)
         if cost - totalPi == 0:
             break
-        
+
     c = res["x"][len(cust):]
     A = [] # array of a_ul values for each path
     for cust in custList: #assembles a_ul value by row
@@ -173,8 +172,8 @@ def findRoutes(depot, custList, capacity):
             routes.append(restrictedRoutes[i])
     return (res["fun"], routes)
 
-        
-        
+
+
 #callback that returns demmand of a cust
 def getDemmand(e):
     return e[1]
@@ -195,7 +194,7 @@ def main():
     #         customersList.append((point, demand, "cust %s" %num))
     #     num += 1
 
-   
+
     routes = findRoutes(depot, customersList, capacity)
     # print(routes)
     print("-----------NY Example-----------")
