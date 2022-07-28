@@ -9,7 +9,7 @@ Date: July 16, 2022
 """
 from scipy.optimize import linprog, milp, LinearConstraint
 import random
-from itertools import combinations
+from itertools import permutations
 import argparse
 import numpy as np
 
@@ -54,6 +54,19 @@ def findRoutes(depot, custList, capacity):
     Parameters: The depot(list), list of customers, and capacity of each truck
     Return Val: a list with the least cost set of routes
     """
+    #preprocessing to find Q for pricing
+    Q = []
+    possiblePairs = permutations(custList, 2)
+    for cust in custList:   # u,v,d pairs where u is the depot
+        Q.append([depot, cust, capacity])
+    for cust in custList:   # u,v,d pairs where v is the depot
+        d = capacity - cust[1]
+        for i in range(0, d + 1):
+            Q.append([cust, depot, i])
+    for pair in possiblePairs:  #u,v,d pairs for every cust pair
+        d = capacity - pair[0][1] #total capacity - demand of first cust
+        for i in range(0, d + 1):
+            Q.append(pair[0], pair[1], i)
     restrictedRoutes = []
     objCoef = []
     #add coefficient for obj function
@@ -72,7 +85,7 @@ def findRoutes(depot, custList, capacity):
             constrCoef = []
             for cust in custList:
                 if cust in route:
-                    constrCoef.append(-1) #aul *piu
+                    constrCoef.append(1) #aul *piu
                 else:
                     constrCoef.append(0)
             filler = [0] * len(restrictedRoutes) #filler for setting the cost coefficient
@@ -81,15 +94,9 @@ def findRoutes(depot, custList, capacity):
             constrCoefList.append(constrCoef)
             routeNum += 1
 
-        #adds coef for setting the value of c_l
-        for i in range(len(restrictedRoutes)):
-            constrCoef = [0] * len(restrictedRoutes)
-            constrCoef[i] = 1
-            filler = [0] * len(custList)
-            constrCoef = filler + constrCoef
-            constrCoefList.append(constrCoef)
-        constrUB = [np.inf] * len(restrictedRoutes)#constraint upper bounds
-        constrLB = [0] * len(restrictedRoutes)#constraint lower bounds
+        #sets c_l to be the bound of each constraint
+        constrUB = []#constraint upper bounds
+        constrLB = []#constraint lower bounds
         for route in restrictedRoutes: #calculates the cost of each route
             cost = getTotalDistance(route)
             constrUB.append(cost) #sets both the upper and lower bound to cost
@@ -98,38 +105,17 @@ def findRoutes(depot, custList, capacity):
         integrality = [0]*  len(objCoef) #restrict the sol to be integer
         res = milp(c=objCoef, constraints=constraints, integrality=integrality)
         piList = res["x"][0:len(restrictedRoutes)]
-        # routeCostList = rex["x"][len(restrictedRoutes):]
-        # possibleCustLists = []
-        route = [depot]
-        # endCust = depot
-        routeCapacity = capacity
-        # print(res)
-        #tries to create the path that violtes the contraint the most
-        # while True:
-        #     #calculates resulting value for each partial path
-        #     totalPi = 0
-        #     for cust in route[1:-1]:
-        #         index = custList.index(cust)
-        #         totalPi += piList[index]
-        #     #generates every possible cust to visit next, includes resulting const val
-        #     for i in range(len(custList)):
-        #         if custList[i] not in route:
-        #             deltaCust = findDistance(endCust[0], custList[i][0]) - (totalPi + piList[i])
-        #             possibleCustLists.append([custList[i], deltaCust])
-        #     possibleCustLists.sort(key=getDemmand)
-        #     #find worse possible point
-        #     minCust = None
-        #     for cust in possibleCustLists:
-        #         if minCust == None or minCust[1] > cust[1]:
-        #             minCust = cust
-        #         if minCust[0][1] > routeCapacity:
-        #             minCust = None
-        #     #if all exceed capacity route is finished
-        #     if minCust != None:
-        #         routeCapacity -= minCust[0][1]
-        #         route.append(minCust[0])
-        #     else:
-                #if the most egrigous route meets the constraint optimal sol is found
+        #pricing to find lowest reduced cost route
+        objCoef = []
+        reducedCost
+        for u,v,d in Q:
+            #calculates the reduced cost for each pair
+            if v != depot:  #if v is the depot don't need to get pi
+                piV = piList[custList.index(v)]     #indexing of piList matches that of custList
+                reducedCost = findDistance(u,v) - piV
+            else:
+                reducedCost = findDistance(u,v)
+            objCoef.append(reducedCost)
             cost = getTotalDistance(route)
             totalPi = 0
             for cust in route[1:-1]:
