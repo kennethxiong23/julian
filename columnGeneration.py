@@ -48,6 +48,14 @@ def getTotalDistance(path):
         distance += findDistance(path[i][0], path[i+1][0])
     return distance
 
+def getLastElement(L):
+    """
+    Purpose: returns the last element in a list
+    Parameters: the list
+    return Val: the last item in the list
+    """
+    return L[-1]
+
 def findRoutes(depot, custList, capacity):
     """
     Purpose: Uses column generation to find the least cost path of routes
@@ -66,21 +74,19 @@ def findRoutes(depot, custList, capacity):
     for pair in possiblePairs:  #u,v,d pairs for every cust pair
         d = capacity - pair[0][1] #total capacity - demand of first cust
         for i in range(0, d + 1):
-            Q.append(pair[0], pair[1], i)
+            Q.append([pair[0], pair[1], i])
     restrictedRoutes = []
     objCoef = []
     #add coefficient for obj function
     for cust in custList:
         restrictedRoutes.append([depot, cust, depot])
-        objCoef.append(-1)
-    while True:
+    flag = 0
+    bool = True
+    while bool:
         #adds to coefficient of c_l for each route, not in obj func, so 0
-        for route in restrictedRoutes:
-            if len(objCoef) < len(custList) + len(restrictedRoutes):
-                objCoef.append(0)
+        objCoef = [-1] * len(custList)
         #coefficient for constraint vars
         constrCoefList = []
-        routeNum = 0
         for route in restrictedRoutes:
             constrCoef = []
             for cust in custList:
@@ -88,56 +94,93 @@ def findRoutes(depot, custList, capacity):
                     constrCoef.append(1) #aul *piu
                 else:
                     constrCoef.append(0)
-            filler = [0] * len(restrictedRoutes) #filler for setting the cost coefficient
-            filler[routeNum] = 1
-            constrCoef += filler
             constrCoefList.append(constrCoef)
-            routeNum += 1
-
         #sets c_l to be the bound of each constraint
         constrUB = []#constraint upper bounds
         constrLB = []#constraint lower bounds
         for route in restrictedRoutes: #calculates the cost of each route
             cost = getTotalDistance(route)
-            constrUB.append(cost) #sets both the upper and lower bound to cost
-            constrLB.append(cost) #makes the cost constant
+            constrUB.append(cost) #sets both the upper to cost
+            constrLB.append(-np.inf)
         constraints = (constrCoefList, constrLB, constrUB)
         integrality = [0]*  len(objCoef) #restrict the sol to be integer
         res = milp(c=objCoef, constraints=constraints, integrality=integrality)
         piList = res["x"][0:len(restrictedRoutes)]
         #pricing to find lowest reduced cost route
         objCoef = []
-        reducedCost
+        constraints = []
+        constrUB = []
+        constrLB = []
         for u,v,d in Q:
             #calculates the reduced cost for each pair
             if v != depot:  #if v is the depot don't need to get pi
                 piV = piList[custList.index(v)]     #indexing of piList matches that of custList
-                reducedCost = findDistance(u,v) - piV
+                reducedCost = findDistance(u[0],v[0]) - piV
             else:
-                reducedCost = findDistance(u,v)
+                reducedCost = findDistance(u[0],v[0])
             objCoef.append(reducedCost)
-            cost = getTotalDistance(route)
-            totalPi = 0
-            for cust in route[1:-1]:
-                index = custList.index(cust)
-                totalPi += piList[index]
-            if cost - totalPi == 0:
-                break
-            route.append(depot)
-            restrictedRoutes.append(route)
+        depotConstCoef = [] #constraint from equation 13b, must start at depot
+        #must equal one
+        constrLB.append(1)
+        constrUB.append(1)
+        #adds only points starting at the depot with full capacity
+        for u,v,d in Q:
+            if u == depot and d == capacity:
+                depotConstCoef.append(1)
+            else:
+                depotConstCoef.append(0)
+        constraints.append(depotConstCoef)
+        for cust in custList:  #constr from 13c, must vist each cust at most once
+            numConstCoef = []
+            for u,v,d in Q:     #for loop to check all u in uvd, cust can only be u once
+                if cust == u:
+                    numConstCoef.append(1)
+                else:
+                    numConstCoef.append(0)
+            constraints.append(numConstCoef)
+            constrLB.append(0) #can be between 0 or 1
+            constrUB.append(1)
+        for cust in custList:   #constr from 13d, must service a visted customer
+            #get all uvd with cust set to be v
+            for i in range(0, capacity  + 1):
+                demConstCoef = []
+                for u,v,d in Q:
+                    if d == i and v == cust:
+                        demConstCoef.append(1)
+                    elif d == i - u[1] and u == cust:   #get all uvd where u is the cust
+                        demConstCoef.append(-1)
+                    else:
+                        demConstCoef.append(0)
+                constraints.append(demConstCoef)
+                #must equal 0
+                constrLB.append(0)
+                constrUB.append(0)
+        integrality = [3] * len(objCoef)    #enfore integer solution
+        res = milp(c=objCoef, constraints=[constraints, constrLB, constrUB], bounds = (0,1), integrality=integrality)
+        if res["fun"] == 0:
+            print("optimal set has been found after %s iterations" %flag)
             break
-        #if the most egrigous route meets the constraint optimal sol is found
+        uvdList = []
+        route = []
+        for i in range(0, len(res["x"])):   #find which uvd in q corresponds to the one and zero
+            if res["x"][i] == 1 or  res["x"][i] > 0.5:
+                uvdList.append(Q[i])
+        uvdList.sort(reverse=True, key=getLastElement) #sort from highest to lowest demand
+        for uvd in uvdList:     #assemble the route
+            route.append(uvd[0])
+        route.append(depot)
+        restrictedRoutes.append(route)
+        print("added %s with cost %s to restrictedRoutes" %(route, res["fun"]))
+        print("iteration %s" %flag)
+        flag += 1
+    #calculates route with restricted set
+    objCoef = []
+    constraints = []
+    constrLB = []
+    constrUB = []
+    for route in restrictedRoutes:
         cost = getTotalDistance(route)
-        totalPi = 0
-        for cust in route[1:-1]:
-            index = custList.index(cust)
-            totalPi += piList[index]
-        # print(cost - totalPi)
-        if cost - totalPi == 0:
-            break
-
-    c = res["x"][len(cust):]
-    A = [] # array of a_ul values for each path
+        objCoef.append(cost)
     for cust in custList: #assembles a_ul value by row
         row = []
         for route in restrictedRoutes:
@@ -145,18 +188,18 @@ def findRoutes(depot, custList, capacity):
                 row.append(1) #vals are stored as -1 to invert the defaul inequality
             else:
                 row.append(0)
-        A.append(row)
-    b_l = [1] * len(A)
-    b_u = [np.inf] * len(A)
-    constraints = (A, b_l, b_u)
-    integrality = np.ones_like(c)
-    res = milp(c =c, constraints = constraints, integrality = integrality)
-    #acutally putting together optimal routes
-    routes = []
-    for i in range(len(res["x"])):
+        constraints.append(row)
+    constrLB =[1] * len(constraints)
+    constrUB = [1] * len(constraints)
+    integrality = [1] * len(objCoef)
+    res = milp(c=objCoef, constraints=[constraints, constrLB, constrUB], integrality=integrality)
+    #calculate the rotes
+    allRoutes = []
+    for i in range(0,len(res["x"])):
         if res["x"][i] == 1:
-            routes.append(restrictedRoutes[i])
-    return (res["fun"], routes)
+            allRoutes.append(restrictedRoutes[i])
+
+    return (allRoutes, res["fun"])
 
 
 
@@ -188,23 +231,23 @@ def main():
     print("Location: %15s %15s %15s %15s" %(depot[0], customersList[0][0], customersList[1][0], customersList[2][0]))
     print("Demand: %15s %15s %15s %15s" %(depot[1], customersList[0][1], customersList[1][1], customersList[2][1]))
     print("\nTruck Capacity %s" %capacity)
-    print("Total Cost: %s" %round(routes[0]))
-    print("# of Routes: %s" %len(routes[1]))
+    print("Total Cost: %s" %round(routes[1]))
+    print("# of Routes: %s" %len(routes[0]))
     routeString = "routes:"
     routeList = []
-    for route in routes[1]:
-        routeString += "\nDepot --> "
+    for route in routes[0]:
+        routeString += "\n"
         for cust in route:
             routeString += "%s --> "
             routeList.append(cust[2])
-        routeString += "Depot\n"
+        routeString += "\n"
     print(routeString %tuple(routeList))
 
 
 
     depot = ((0,0), 0, "San Diego")
     capacity = args.capacity
-    customersList = [((0,1), 1, "Upper West Side"), ((0,1), 1, "Midtown"), ((0,1), 1, "Park Slope")]
+    customersList = [((0,1.05), 1, "Upper West Side"), ((0,0.96), 1, "Midtown"), ((0,1), 1.3, "Park Slope")]
     customersList = [] #list of lists
 
     # generates a random route with random demand for each cust
@@ -238,18 +281,17 @@ def main():
 
     routes = findRoutes(depot, customersList, capacity)
 
-    assert routes == newRoutes
-    print("Total Cost: %s" %round(routes[0]))
+    print("Total Cost: %s" %round(routes[1]))
     routeString = "routes:"
     routeList = []
     i = 0
-    for route in routes:
-        routeString += "\n%s: Depot --> "
+    for route in routes[0]:
+        routeString += "\n%s: "
         routeList.append(colors[i])
         for cust in route:
             routeString += "%s --> "
             routeList.append(cust[2])
-        routeString += "Depot\n"
+        routeString += "\n"
         i += 1
     print(routeString %tuple(routeList))
 
