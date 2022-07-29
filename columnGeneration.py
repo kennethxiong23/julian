@@ -12,6 +12,7 @@ import random
 from itertools import permutations
 import argparse
 import numpy as np
+from time import time
 
 #arguement parsing
 ap = argparse.ArgumentParser()
@@ -82,6 +83,8 @@ def findRoutes(depot, custList, capacity):
         restrictedRoutes.append([depot, cust, depot])
     flag = 0
     bool = True
+    prevCost = None
+    prevAdded = None
     while bool:
         #adds to coefficient of c_l for each route, not in obj func, so 0
         objCoef = [-1] * len(custList)
@@ -157,9 +160,6 @@ def findRoutes(depot, custList, capacity):
                 constrUB.append(0)
         integrality = [3] * len(objCoef)    #enfore integer solution
         res = milp(c=objCoef, constraints=[constraints, constrLB, constrUB], bounds = (0,1), integrality=integrality)
-        if res["fun"] == 0:
-            print("optimal set has been found after %s iterations" %flag)
-            break
         uvdList = []
         route = []
         for i in range(0, len(res["x"])):   #find which uvd in q corresponds to the one and zero
@@ -168,8 +168,19 @@ def findRoutes(depot, custList, capacity):
         uvdList.sort(reverse=True, key=getLastElement) #sort from highest to lowest demand
         for uvd in uvdList:     #assemble the route
             route.append(uvd[0])
+        #iteration termination when cost is 0 or cost is very small and no longer chaning
+        if round(res["fun"], 10) == 0:
+            print("optimal set has been found after %s iterations" %flag)
+            break
+        if prevCost = res["fun"] and prevAdded == route:
+            if res["fun"] < 0:
+                print("optimal set has been found after %s iterations" %flag)
+                break
+        prevCost = res["fun"]
+        prevAdded = route
         route.append(depot)
         restrictedRoutes.append(route)
+
         print("added %s with cost %s to restrictedRoutes" %(route, res["fun"]))
         print("iteration %s" %flag)
         flag += 1
@@ -278,9 +289,10 @@ def main():
     print(demmandString %tuple(demmandList))
     print("\nTruck Capacity %s" %capacity)
     print(routes)
-
+    t0 = time()
     routes = findRoutes(depot, customersList, capacity)
-
+    t1 = time()
+    print(t1-t0)
     print("Total Cost: %s" %round(routes[1]))
     routeString = "routes:"
     routeList = []
