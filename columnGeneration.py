@@ -172,7 +172,7 @@ def findRoutes(depot, custList, capacity):
         if round(res["fun"], 10) == 0:
             print("optimal set has been found after %s iterations" %flag)
             break
-        if prevCost = res["fun"] and prevAdded == route:
+        if prevCost == res["fun"] and prevAdded == route:
             if res["fun"] < 0:
                 print("optimal set has been found after %s iterations" %flag)
                 break
