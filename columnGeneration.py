@@ -182,6 +182,7 @@ def findRoutes(depot, custList, capacity):
         restrictedRoutes.append(route)
 
         print("added %s with cost %s to restrictedRoutes" %(route, res["fun"]))
+        print("the size of the restriced set of routes is now %s" %len(restrictedRoutes))
         print("iteration %s" %flag)
         flag += 1
     #calculates route with restricted set
