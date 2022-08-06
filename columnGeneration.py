@@ -13,7 +13,9 @@ from itertools import permutations
 import argparse
 import numpy as np
 from time import time
+from time import sleep
 
+random.seed(0)
 #arguement parsing
 ap = argparse.ArgumentParser()
 ap.add_argument("-n", "--number_of_custs", type=int)
@@ -59,13 +61,13 @@ def getLastElement(L):
 
 def findRoutes(depot, custList, capacity):
     """
-    Purpose: Uses column generation to find the least cost path of routes
+    Purpose: Uses column generation to find the lowest reduced cost routes
     Parameters: The depot(list), list of customers, and capacity of each truck
-    Return Val: a list with the least cost set of routes
+    Return Val: a list with the least cost set of routes, the total cost
     """
     #preprocessing to find Q for pricing
     Q = []
-    possiblePairs = permutations(custList, 2)
+    possiblePairs = list(permutations(custList, 2))
     for cust in custList:   # u,v,d pairs where u is the depot
         Q.append([depot, cust, capacity])
     for cust in custList:   # u,v,d pairs where v is the depot
@@ -74,18 +76,19 @@ def findRoutes(depot, custList, capacity):
             Q.append([cust, depot, i])
     for pair in possiblePairs:  #u,v,d pairs for every cust pair
         d = capacity - pair[0][1] #total capacity - demand of first cust
-        for i in range(0, d + 1):
+        for i in range(pair[1][1], d + 1):
             Q.append([pair[0], pair[1], i])
+
+    #output (dual obj) + |N| * reduced cost
     restrictedRoutes = []
     objCoef = []
     #add coefficient for obj function
     for cust in custList:
         restrictedRoutes.append([depot, cust, depot])
-    flag = 0
-    bool = True
+    flag = 0 #keeps track of iterations
     prevCost = None
     prevAdded = None
-    while bool:
+    while True:
         #adds to coefficient of c_l for each route, not in obj func, so 0
         objCoef = [-1] * len(custList)
         #coefficient for constraint vars
@@ -106,9 +109,15 @@ def findRoutes(depot, custList, capacity):
             constrUB.append(cost) #sets both the upper to cost
             constrLB.append(-np.inf)
         constraints = (constrCoefList, constrLB, constrUB)
-        integrality = [0]*  len(objCoef) #restrict the sol to be integer
+        integrality = [0]*  len(objCoef) #restrict the sol to be non integer
         res = milp(c=objCoef, constraints=constraints, integrality=integrality)
-        piList = res["x"][0:len(restrictedRoutes)]
+        dualObjCost = res['fun']
+        # print("len of rr")
+        # print(len(restrictedRoutes))
+        # print("pi values")
+        # print(res["x"])
+        # print([1,2,3][0:7])
+        piList = res["x"]
         #pricing to find lowest reduced cost route
         objCoef = []
         constraints = []
@@ -145,7 +154,7 @@ def findRoutes(depot, custList, capacity):
             constrUB.append(1)
         for cust in custList:   #constr from 13d, must service a visted customer
             #get all uvd with cust set to be v
-            for i in range(0, capacity  + 1):
+            for i in range(cust[1], capacity  + 1):
                 demConstCoef = []
                 for u,v,d in Q:
                     if d == i and v == cust:
@@ -172,18 +181,22 @@ def findRoutes(depot, custList, capacity):
         if round(res["fun"], 10) == 0:
             print("optimal set has been found after %s iterations" %flag)
             break
-        if prevCost == res["fun"] and prevAdded == route:
-            if res["fun"] < 0:
-                print("optimal set has been found after %s iterations" %flag)
-                break
+        # if prevCost == res["fun"] and prevAdded == route:
+        #     if res["fun"] > -0.00001:
+        #         print("optimal set has been found after %s iterations" %flag)
+        #         break
+        if res["fun"] > -0.00001:
+            print("optimal set has been found after %s iterations" %flag)
+            break
         prevCost = res["fun"]
         prevAdded = route
         route.append(depot)
         restrictedRoutes.append(route)
-
-        print("added %s with cost %s to restrictedRoutes" %(route, res["fun"]))
+        val = -dualObjCost + len(cust) * res["fun"]
+        print("\n added %s with cost %s to restrictedRoutes" %(route, res["fun"]))
         print("the size of the restriced set of routes is now %s" %len(restrictedRoutes))
-        print("iteration %s" %flag)
+        print("Lagrangian bound: %s" %val)
+        print("iteration %s \n" %flag)
         flag += 1
     #calculates route with restricted set
     objCoef = []
@@ -205,7 +218,8 @@ def findRoutes(depot, custList, capacity):
     constrUB = [1] * len(constraints)
     integrality = [1] * len(objCoef)
     res = milp(c=objCoef, constraints=[constraints, constrLB, constrUB], integrality=integrality)
-    #calculate the rotes
+    #calculate the routes
+    print("dual lp obj: %s, primal ilp obj: %s" %(dualObjCost, res["fun"]))
     allRoutes = []
     for i in range(0,len(res["x"])):
         if res["x"][i] == 1:
@@ -213,63 +227,69 @@ def findRoutes(depot, custList, capacity):
 
     return (allRoutes, res["fun"])
 
-
-
 #callback that returns demmand of a cust
 def getDemmand(e):
     return e[1]
 
 def main():
-    #location is a tuple. Each cust is a list of with location and demmand
-    depot = ((0,0), 0, "San Diego")
-    capacity = 2
-    customersList = [((0,1), 1, "Upper West Side"), ((0,1), 1, "Midtown"), ((0,1), 1, "Park Slope")]
-    # customersList = [] #list of lists
+    # #location is a tuple. Each cust is a list of with location and demmand
+    # depot = ((0,0), 0, "San Diego")
+    # capacity = 2
+    # customersList = [((0,1), 1, "Upper West Side"), ((0,1), 1, "Midtown"), ((0,1), 1, "Park Slope")]
+    # # customersList = [] #list of lists
 
-    #generates a random route with random demand for each cust
-    # num  = 1
-    # while len(customersList) < args.number_of_custs:
-    #     point = (random.randrange(-30,30), random.randrange(-30,30))
-    #     demand = random.randrange(1, args.demand_max)
-    #     if point not in customersList:
-    #         customersList.append((point, demand, "cust %s" %num))
-    #     num += 1
+    # #generates a random route with random demand for each cust
+    # # num  = 1
+    # # while len(customersList) < args.number_of_custs:
+    # #     point = (random.randrange(-30,30), random.randrange(-30,30))
+    # #     demand = random.randrange(1, args.demand_max)
+    # #     if point not in customersList:
+    # #         customersList.append((point, demand, "cust %s" %num))
+    # #     num += 1
 
 
-    routes = findRoutes(depot, customersList, capacity)
-    # print(routes)
-    print("-----------NY Example-----------")
-    print("Customers: %15s %15s %15s %15s" %(depot[2], customersList[0][2], customersList[1][2], customersList[2][2]))
-    print("Location: %15s %15s %15s %15s" %(depot[0], customersList[0][0], customersList[1][0], customersList[2][0]))
-    print("Demand: %15s %15s %15s %15s" %(depot[1], customersList[0][1], customersList[1][1], customersList[2][1]))
-    print("\nTruck Capacity %s" %capacity)
-    print("Total Cost: %s" %round(routes[1]))
-    print("# of Routes: %s" %len(routes[0]))
-    routeString = "routes:"
-    routeList = []
-    for route in routes[0]:
-        routeString += "\n"
-        for cust in route:
-            routeString += "%s --> "
-            routeList.append(cust[2])
-        routeString += "\n"
-    print(routeString %tuple(routeList))
+    # routes = findRoutes(depot, customersList, capacity)
+    # # print(routes)
+    # print("-----------NY Example-----------")
+    # print("Customers: %15s %15s %15s %15s" %(depot[2], customersList[0][2], customersList[1][2], customersList[2][2]))
+    # print("Location: %15s %15s %15s %15s" %(depot[0], customersList[0][0], customersList[1][0], customersList[2][0]))
+    # print("Demand: %15s %15s %15s %15s" %(depot[1], customersList[0][1], customersList[1][1], customersList[2][1]))
+    # print("\nTruck Capacity %s" %capacity)
+    # print("Total Cost: %s" %round(routes[1]))
+    # print("# of Routes: %s" %len(routes[0]))
+    # routeString = "routes:"
+    # routeList = []
+    # for route in routes[0]:
+    #     routeString += "\n"
+    #     for cust in route:
+    #         routeString += "%s --> "
+    #         routeList.append(cust[2])
+    #     routeString += "\n"
+    # print(routeString %tuple(routeList))
 
 
 
     depot = ((0,0), 0, "San Diego")
     capacity = args.capacity
-    customersList = [((0,1.05), 1, "Upper West Side"), ((0,0.96), 1, "Midtown"), ((0,1), 1.3, "Park Slope")]
     customersList = [] #list of lists
 
-    # generates a random route with random demand for each cust
+    #generates a random set of cust with random demand for each cust
     num  = 1
-    while len(customersList) < args.number_of_custs:
-        point = (random.randrange(-30,30), random.randrange(-30,30))
-        demand = random.randrange(1, args.demand_max)
+    while len(customersList) < args.number_of_custs:# # of cust/demand set by user
+        point = (random.randrange(-30,30), random.randrange(-30,30)) #random point
+        demand = random.randrange(1, args.demand_max) #random demand
+        #check is somehow point was already generated
         if point not in customersList:
             customersList.append((point, demand, "cust %s" %num))
         num += 1
+
+    t0 = time()
+    #calculates routes
+    routes = findRoutes(depot, customersList, capacity)
+    t1 = time()
+    print(t1-t0)
+
+    #pretty print display code for solution
     print("-----------Random Example-----------")
     colors = ["green", "orange", "yellow", "purple", "grey", "lime", "brown"]
     customerString = "Customers: %15s"
@@ -289,11 +309,6 @@ def main():
     print(locationString %tuple(locationList))
     print(demmandString %tuple(demmandList))
     print("\nTruck Capacity %s" %capacity)
-    print(routes)
-    t0 = time()
-    routes = findRoutes(depot, customersList, capacity)
-    t1 = time()
-    print(t1-t0)
     print("Total Cost: %s" %round(routes[1]))
     routeString = "routes:"
     routeList = []
