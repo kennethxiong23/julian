@@ -167,12 +167,14 @@ def findRoutes(depot, custList, capacity):
                 #must equal 0
                 constrLB.append(0)
                 constrUB.append(0)
+        integrality = [2] * len(objCoef)    #enfore fractional solution
+        fractionalRes = milp(c=objCoef, constraints=[constraints, constrLB, constrUB], bounds = (0,1), integrality=integrality)
         integrality = [3] * len(objCoef)    #enfore integer solution
         res = milp(c=objCoef, constraints=[constraints, constrLB, constrUB], bounds = (0,1), integrality=integrality)
         uvdList = []
         route = []
         for i in range(0, len(res["x"])):   #find which uvd in q corresponds to the one and zero
-            if res["x"][i] == 1 or  res["x"][i] > 0.5:
+            if res["x"][i] == 1 or  res["x"][i] > 0.000001:
                 uvdList.append(Q[i])
         uvdList.sort(reverse=True, key=getLastElement) #sort from highest to lowest demand
         for uvd in uvdList:     #assemble the route
@@ -192,11 +194,38 @@ def findRoutes(depot, custList, capacity):
         prevAdded = route
         route.append(depot)
         restrictedRoutes.append(route)
+
+        # calculate the fractional route
+        fracRoute = []
+        uvdList = []
+        route = []
+        for i in range(0, len(fractionalRes["x"])):   #find which uvd in q corresponds to the one and zero
+            if fractionalRes["x"][i] == 1 or  fractionalRes["x"][i] > 0.000001:
+                uvdList.append(Q[i])
+        uvdList.sort(reverse=True, key=getLastElement) #sort from highest to lowest demand
+        for uvd in uvdList:     #assemble the route
+            fracRoute.append(uvd[0])
+        fracRoute.append(depot)
+        #find how many times each cust occurs in the frac route
+        routeCusts = []
+        numList = []
+        for cust in fracRoute:
+            if cust != depot and cust[2]  not in routeCusts:
+                routeCusts.append(cust[2])
+                numList.append(1)
+            if cust[2] in routeCusts:
+                i = routeCusts.index(cust[2])
+                numList[i] += 1
+        for i in range(len(routeCusts)):
+            print("%s occured %s times" %(routeCusts[i], numList[i]))
+            
+        print("\nFractional solutiont route: ", fracRoute)
         val = -dualObjCost + len(cust) * res["fun"]
-        print("\n added %s with cost %s to restrictedRoutes" %(route, res["fun"]))
+        print("\n added %s with cost %s to restrictedRoutes" %(restrictedRoutes[-1], res["fun"]))
         print("the size of the restriced set of routes is now %s" %len(restrictedRoutes))
         print("Lagrangian bound: %s" %val)
         print("iteration %s \n" %flag)
+        input("click enter to move on to next iteration\n")
         flag += 1
     #calculates route with restricted set
     objCoef = []
@@ -232,12 +261,12 @@ def getDemmand(e):
     return e[1]
 
 def main():
-    # #location is a tuple. Each cust is a list of with location and demmand
+    #location is a tuple. Each cust is a list of with location and demmand
     # depot = ((0,0), 0, "San Diego")
-    # capacity = 2
-    # customersList = [((0,1), 1, "Upper West Side"), ((0,1), 1, "Midtown"), ((0,1), 1, "Park Slope")]
+    # capacity = 4
+    # customersList = [((0,1), 1, "Upper West Side"), ((0,1), 2, "Midtown"), ((0,1), 2, "Park Slope")]
     # # customersList = [] #list of lists
-
+    #
     # #generates a random route with random demand for each cust
     # # num  = 1
     # # while len(customersList) < args.number_of_custs:
@@ -246,8 +275,8 @@ def main():
     # #     if point not in customersList:
     # #         customersList.append((point, demand, "cust %s" %num))
     # #     num += 1
-
-
+    #
+    #
     # routes = findRoutes(depot, customersList, capacity)
     # # print(routes)
     # print("-----------NY Example-----------")
@@ -266,7 +295,7 @@ def main():
     #         routeList.append(cust[2])
     #     routeString += "\n"
     # print(routeString %tuple(routeList))
-
+    #
 
 
     depot = ((0,0), 0, "San Diego")
